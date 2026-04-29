@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Data Maps — AgroSolar Austria{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  .tab-btn { transition: all .2s; }
+  .tab-btn.active { background: #16a34a; color: white; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+  <div class="mb-10">
+    <h1 class="text-4xl font-bold text-gray-900 mb-2">Austria Data Maps</h1>
+    <p class="text-gray-500 text-lg">Interactive solar irradiance and agricultural land use data for Austria.</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-8 bg-gray-100 p-1 rounded-xl w-fit">
+    <button class="tab-btn active px-5 py-2 rounded-lg font-semibold text-sm" onclick="switchTab('solar', this)">
+      ☀️ Solar Irradiance
+    </button>
+    <button class="tab-btn px-5 py-2 rounded-lg font-semibold text-sm text-gray-600 hover:bg-gray-200" onclick="switchTab('landuse', this)">
+      🌾 Land Use
+    </button>
+  </div>
+
+  <!-- Solar tab -->
+  <div id="tab-solar">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-gray-900">Solar Resource Map</h2>
+          <p class="text-sm text-gray-500">Raster data from SolarGIS covering all of Austria</p>
+        </div>
+        <select id="layer-select"
+                class="border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-brand-400 outline-none"
+                onchange="loadSolarMap(this.value)">
+          {% for layer in layers %}
+          <option value="{{ layer }}">{{ layer_labels[layer] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="solar-loading" class="flex items-center justify-center h-64 text-gray-400 gap-3">
+        <div class="w-6 h-6 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
+        Loading map…
+      </div>
+      <div id="solar-map" style="height:520px;display:none;" class="rounded-xl overflow-hidden"></div>
+    </div>
+
+    <!-- Layer info cards -->
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {% for layer, label, desc, color in [
+        ('GHI', 'Global Horizontal Irradiance', 'Total solar radiation received per unit of horizontal surface', 'yellow'),
+        ('PVOUT', 'PV Power Output', 'Estimated photovoltaic output per installed kWp capacity', 'orange'),
+        ('DNI', 'Direct Normal Irradiance', 'Solar radiation on a surface perpendicular to the sun rays', 'amber'),
+        ('TEMP', 'Temperature', 'Average ambient temperature — affects PV panel efficiency', 'blue'),
+      ] %}
+      <div class="bg-white border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-brand-400 hover:shadow-sm transition layer-card"
+           onclick="document.getElementById('layer-select').value='{{ layer }}'; loadSolarMap('{{ layer }}')">
+        <div class="text-xs font-bold text-{{ color }}-600 bg-{{ color }}-50 px-2 py-0.5 rounded-full w-fit mb-2">{{ layer }}</div>
+        <p class="font-semibold text-gray-800 text-sm mb-1">{{ label }}</p>
+        <p class="text-xs text-gray-500">{{ desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Land use tab -->
+  <div id="tab-landuse" class="hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-gray-900">Agricultural Land Use by State</h2>
+          <p class="text-sm text-gray-500">Click a bar to see the crop breakdown for that state</p>
+        </div>
+        <select id="category-select"
+                class="border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-brand-400 outline-none"
+                onchange="loadLanduse(this.value)">
+          {% for cat in categories %}
+          <option value="{{ cat }}">{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="landuse-loading" class="flex items-center justify-center h-48 text-gray-400 gap-3">
+        <div class="w-6 h-6 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
+        Loading chart…
+      </div>
+      <div id="landuse-chart" style="height:380px;display:none;"></div>
+    </div>
+
+    <!-- Detail chart -->
+    <div id="detail-section" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6 hidden">
+      <h2 class="text-xl font-bold text-gray-900 mb-1" id="detail-title">Crop breakdown</h2>
+      <p class="text-sm text-gray-500 mb-4" id="detail-subtitle"></p>
+      <div id="detail-chart" style="height:340px;"></div>
+    </div>
+
+    <!-- Overview -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+      <h2 class="text-xl font-bold text-gray-900 mb-1">Total Agricultural Land Use</h2>
+      <p class="text-sm text-gray-500 mb-4">All categories combined across Austria</p>
+      <div id="overview-loading" class="flex items-center justify-center h-48 text-gray-400 gap-3">
+        <div class="w-6 h-6 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
+        Loading…
+      </div>
+      <div id="overview-chart" style="height:380px;display:none;"></div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentCategory = "{{ categories[0] }}";
+let currentState = null;
+
+function switchTab(tab, btn) {
+  document.getElementById('tab-solar').classList.toggle('hidden', tab !== 'solar');
+  document.getElementById('tab-landuse').classList.toggle('hidden', tab !== 'landuse');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // nothing extra needed — DOMContentLoaded pre-loads everything
+}
+
+async function loadSolarMap(layer) {
+  document.getElementById('solar-loading').style.display = 'flex';
+  document.getElementById('solar-map').style.display = 'none';
+  try {
+    const res = await fetch(`/api/solar/${layer}`);
+    const fig = await res.json();
+    document.getElementById('solar-loading').style.display = 'none';
+    document.getElementById('solar-map').style.display = 'block';
+    Plotly.react('solar-map', fig.data, {
+      ...fig.layout,
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      margin: {t:0, r:0, b:0, l:0},
+    });
+  } catch(e) {
+    document.getElementById('solar-loading').innerHTML = '<span class="text-red-500">Error loading map. Is the server running?</span>';
+  }
+}
+
+async function loadLanduse(category) {
+  currentCategory = category;
+  currentState = null;
+  document.getElementById('detail-section').classList.add('hidden');
+  document.getElementById('landuse-loading').style.display = 'flex';
+  document.getElementById('landuse-chart').style.display = 'none';
+  const res = await fetch(`/api/landuse/${encodeURIComponent(category)}`);
+  const fig = await res.json();
+  document.getElementById('landuse-loading').style.display = 'none';
+  document.getElementById('landuse-chart').style.display = 'block';
+  const layout = {
+    ...fig.layout,
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: {family: 'Inter, sans-serif'},
+    margin: {t:30, r:20, b:100, l:60},
+  };
+  Plotly.react('landuse-chart', fig.data, layout);
+  document.getElementById('landuse-chart').on('plotly_click', async function(data) {
+    const state = data.points[0].x;
+    await loadDetail(category, state);
+  });
+}
+
+async function loadDetail(category, state) {
+  currentState = state;
+  const res = await fetch(`/api/landuse/${encodeURIComponent(category)}/${encodeURIComponent(state)}`);
+  if (!res.ok) return;
+  const fig = await res.json();
+  document.getElementById('detail-section').classList.remove('hidden');
+  document.getElementById('detail-title').textContent = `${category} — ${state}`;
+  document.getElementById('detail-subtitle').textContent = 'Area (ha) by crop type. Click another bar to update.';
+  const layout = {
+    ...fig.layout,
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: {family: 'Inter, sans-serif'},
+    margin: {t:20, r:20, b:120, l:60},
+  };
+  Plotly.react('detail-chart', fig.data, layout);
+  document.getElementById('detail-section').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+async function loadOverview() {
+  document.getElementById('overview-loading').style.display = 'flex';
+  document.getElementById('overview-chart').style.display = 'none';
+  const res = await fetch('/api/landuse-overview');
+  const fig = await res.json();
+  document.getElementById('overview-loading').style.display = 'none';
+  document.getElementById('overview-chart').style.display = 'block';
+  Plotly.react('overview-chart', fig.data, {
+    ...fig.layout,
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: {family: 'Inter, sans-serif'},
+    margin: {t:30, r:20, b:100, l:60},
+  });
+}
+
+// Load initial data on page load
+window.addEventListener('DOMContentLoaded', () => {
+  loadSolarMap('GHI');
+  loadLanduse("{{ categories[0] }}");
+  loadOverview();
+});
+</script>
+{% endblock %}
