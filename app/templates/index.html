@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}AgroSolar Austria — Agrivoltaic Potential Calculator{% endblock %}
+{% block title %}AgriPV Austria — Agrivoltaic Potential Calculator{% endblock %}
 
 {% block content %}
 
 <!-- Hero -->
-<section class="relative bg-gray-900 overflow-hidden min-h-[92vh] flex items-center">
+<section class="relative bg-gray-900 overflow-hidden">
   <!-- Background gradient blobs -->
   <div class="absolute inset-0 overflow-hidden pointer-events-none">
     <div class="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-brand-600/20 blur-3xl"></div>
@@ -12,49 +12,53 @@
     <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full bg-amber-500/5 blur-3xl"></div>
   </div>
 
-  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
-    <div class="inline-flex items-center gap-2 bg-brand-900/60 border border-brand-700/50 rounded-full px-4 py-1.5 mb-8">
-      <span class="w-2 h-2 rounded-full bg-brand-400 animate-pulse"></span>
-      <span class="text-brand-300 text-sm font-medium">Agrivoltaic research tool for Austria</span>
-    </div>
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+    <div class="grid lg:grid-cols-2 gap-16 items-center">
 
-    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-tight mb-6">
-      Grow food.<br/>
-      <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-emerald-300">
-        Generate energy.
-      </span>
-    </h1>
-    <p class="text-xl text-gray-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-      Calculate the agrivoltaic potential of your farmland in Austria.
-      See how solar panels above your crops can increase income, save water, and protect against hail.
-    </p>
-    <div class="flex flex-col sm:flex-row gap-4 justify-center">
-      <a href="/calculator"
-         class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold
-                px-8 py-4 rounded-xl text-lg transition-all shadow-lg shadow-brand-900/40 hover:scale-105">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-        </svg>
-        Start Calculator
-      </a>
-      <a href="/map"
-         class="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white font-semibold
-                px-8 py-4 rounded-xl text-lg transition-all border border-gray-700 hover:border-gray-500">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-        </svg>
-        Explore Data Maps
-      </a>
-    </div>
-
-    <!-- Stats row -->
-    <div class="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
-      {% for value, label in [('35–200%', 'Land use efficiency gain'), ('20–30%', 'Less irrigation needed'), ('300–5000%', 'Revenue vs. farm-only'), ('48–53%', 'Risk floor lift')] %}
-      <div class="bg-gray-800/60 border border-gray-700/50 rounded-xl p-4">
-        <div class="text-2xl font-bold text-brand-400">{{ value }}</div>
-        <div class="text-xs text-gray-400 mt-1">{{ label }}</div>
+      <!-- Left: text -->
+      <div>
+        <h1 class="text-5xl sm:text-6xl font-extrabold text-white leading-tight mb-6">
+          Grow food and produce energy on the same land.
+          <span class="block text-2xl sm:text-3xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-emerald-300 mt-3">
+            Increase land use, reduce risk and climate impact on your farm.
+          </span>
+        </h1>
+        <div class="flex flex-col sm:flex-row gap-4 mt-10">
+          <a href="/calculator"
+             class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold
+                    px-8 py-4 rounded-xl text-lg transition-all shadow-lg shadow-brand-900/40 hover:scale-105">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            Start Calculator
+          </a>
+          <a href="/map"
+             class="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white font-semibold
+                    px-8 py-4 rounded-xl text-lg transition-all border border-gray-700 hover:border-gray-500">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+            </svg>
+            Explore Data Maps
+          </a>
+        </div>
       </div>
-      {% endfor %}
+
+      <!-- Right: photo collage -->
+      <div class="hidden lg:grid grid-cols-2 gap-3 h-[480px]">
+        <div class="row-span-2 rounded-2xl overflow-hidden">
+          <img src="{{ url_for('static', filename='img/agrivoltaic-1.jpeg') }}"
+               alt="Agrivoltaic installation" class="w-full h-full object-cover">
+        </div>
+        <div class="rounded-2xl overflow-hidden">
+          <img src="{{ url_for('static', filename='img/agrivoltaic-2.jpeg') }}"
+               alt="Solar panels over crops" class="w-full h-full object-cover">
+        </div>
+        <div class="rounded-2xl overflow-hidden">
+          <img src="{{ url_for('static', filename='img/agrivoltaic-3.jpg') }}"
+               alt="Agricultural canopy" class="w-full h-full object-cover">
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
@@ -64,13 +68,13 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-16">
       <h2 class="text-4xl font-bold text-gray-900 mb-4">How it works</h2>
-      <p class="text-lg text-gray-500 max-w-xl mx-auto">Three steps to understand your farm's agrivoltaic potential</p>
+      <p class="text-lg text-gray-500 max-w-xl mx-auto">Enter your farm location and simple data about your farm, get an estimate for AgriPV in seconds.</p>
     </div>
     <div class="grid md:grid-cols-3 gap-8">
-      {% for step, icon_path, title, desc in [
-        ('01', 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', 'Pick your location', 'Click on the interactive Austria map to set your farm location. We automatically pull solar irradiance data for that exact point.'),
-        ('02', 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z', 'Enter your farm details', 'Tell us your farm area, what crops you grow, and whether you irrigate. Default values are pre-filled with Austrian averages.'),
-        ('03', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 'Get your potential report', 'Receive a full breakdown: energy yield, financial analysis, water savings, crop impact, and hail protection — all grounded in peer-reviewed research.')
+      {% for step, icon_path, title in [
+        ('01', 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z', 'Pick your location'),
+        ('02', 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z', 'Enter your farm details'),
+        ('03', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 'Get your potential report')
       ] %}
       <div class="relative group">
         <div class="absolute -inset-0.5 bg-gradient-to-r from-brand-500 to-emerald-400 rounded-2xl opacity-0 group-hover:opacity-100 transition blur"></div>
@@ -82,7 +86,6 @@
             </svg>
           </div>
           <h3 class="text-xl font-bold text-gray-900 mb-3">{{ title }}</h3>
-          <p class="text-gray-500 leading-relaxed">{{ desc }}</p>
         </div>
       </div>
       {% endfor %}
@@ -95,34 +98,25 @@
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-16">
       <h2 class="text-4xl font-bold text-gray-900 mb-4">What we calculate</h2>
-      <p class="text-lg text-gray-500 max-w-xl mx-auto">Every metric is derived from published agrivoltaic research</p>
     </div>
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {% for bg, icon_color, icon_path, title, desc, source in [
         ('bg-yellow-50 border-yellow-200', 'text-yellow-600',
          'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z',
-         'Solar Energy Yield', '315–420 MWh per hectare per year, based on your location\'s GHI and standard agri-PV panel configuration.',
-         'Fraunhofer ISE 2024'),
-        ('bg-brand-50 border-brand-200', 'text-brand-600',
-         'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3',
-         'Land Equivalent Ratio', 'LER 1.35–2.00: agrivoltaic systems produce more per hectare than separate solar-only and farm-only plots.',
-         'Cuppari et al. 2021'),
+         'Solar Energy Yield', 'How much solar energy can be produced on your farmland.',
+         'Fraunhofer ISE'),
         ('bg-blue-50 border-blue-200', 'text-blue-600',
          'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-         'Water Savings', 'Panel shading reduces evapotranspiration, cutting irrigation demand by 20–30% — significant in dry Austrian summers.',
+         'Water Savings', 'How much irrigation can be saved',
          'Elamri et al. 2018'),
         ('bg-emerald-50 border-emerald-200', 'text-emerald-600',
          'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-         'Financial Profitability', 'Break-even electricity tariff, payback period, and net annual benefit — using the FEADPLUS economic framework.',
+         'Financial Profitability', 'Financial analysis of agriPV for your farm. Cost of a system, financial change due to changed land use. ',
          'Feuerbacher et al. 2021'),
-        ('bg-orange-50 border-orange-200', 'text-orange-600',
-         'M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z',
-         'Hail & Frost Protection', 'Panels act as a physical barrier reducing hail damage, particularly valuable for fruit, berry, and vegetable crops.',
-         'Fraunhofer ISE 2024'),
         ('bg-purple-50 border-purple-200', 'text-purple-600',
          'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
-         'Weather Risk Diversification', 'Solar revenue is negatively correlated with crop revenue — bad crop years are offset by high solar output.',
-         'Cuppari et al. 2021'),
+         'Scenario Analysis', 'How does agriPV affect your farm in hot or cold years.',
+         'Fraunhofer ISE'),
       ] %}
       <div class="bg-white border {{ bg.split()[1] }} rounded-2xl p-6 hover:shadow-md transition-shadow">
         <div class="w-10 h-10 {{ bg }} rounded-xl flex items-center justify-center mb-4 border {{ bg.split()[1] }}">
@@ -136,22 +130,6 @@
       </div>
       {% endfor %}
     </div>
-  </div>
-</section>
-
-<!-- CTA -->
-<section class="py-24 bg-gray-900">
-  <div class="max-w-3xl mx-auto px-4 text-center">
-    <h2 class="text-4xl font-bold text-white mb-6">Ready to calculate your potential?</h2>
-    <p class="text-gray-400 text-lg mb-10">It takes less than 2 minutes. No account needed.</p>
-    <a href="/calculator"
-       class="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-bold
-              px-10 py-5 rounded-xl text-xl transition-all shadow-xl shadow-brand-900/50 hover:scale-105">
-      Start the Calculator
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-      </svg>
-    </a>
   </div>
 </section>
 

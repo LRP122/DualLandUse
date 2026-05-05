@@ -1,11 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Data Maps — AgroSolar Austria{% endblock %}
+{% block title %}Data Maps — AgriPV Austria{% endblock %}
 
 {% block head %}
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
   .tab-btn { transition: all .2s; }
   .tab-btn.active { background: #16a34a; color: white; }
+  #solar-map { height: 520px; border-radius: 0.75rem; z-index: 0; }
+  .colorbar {
+    position: absolute; bottom: 20px; right: 14px; z-index: 999;
+    background: rgba(255,255,255,0.93); backdrop-filter: blur(6px);
+    border-radius: 10px; padding: 10px 14px 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.13); min-width: 150px;
+    font-family: Inter, sans-serif;
+  }
+  .colorbar-title { font-size: 11px; font-weight: 600; color: #374151; margin-bottom: 5px; line-height: 1.3; }
+  .colorbar-bar   { height: 10px; border-radius: 5px; margin-bottom: 4px; }
+  .colorbar-nums  { display: flex; justify-content: space-between; font-size: 10px; color: #6b7280; }
 </style>
 {% endblock %}
 
@@ -44,11 +56,21 @@
         </select>
       </div>
 
-      <div id="solar-loading" class="flex items-center justify-center h-64 text-gray-400 gap-3">
-        <div class="w-6 h-6 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
-        Loading map…
+      <div class="relative">
+        <div id="solar-map" class="border border-gray-200"></div>
+        <div id="solar-loading" class="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-xl gap-3 text-gray-400" style="z-index:10">
+          <div class="w-6 h-6 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
+          Loading map…
+        </div>
+        <div class="colorbar hidden" id="solar-colorbar">
+          <div class="colorbar-title" id="colorbar-title"></div>
+          <div class="colorbar-bar" id="colorbar-bar"></div>
+          <div class="colorbar-nums">
+            <span id="colorbar-min"></span>
+            <span id="colorbar-max"></span>
+          </div>
+        </div>
       </div>
-      <div id="solar-map" style="height:520px;display:none;" class="rounded-xl overflow-hidden"></div>
     </div>
 
     <!-- Layer info cards -->
@@ -97,7 +119,7 @@
     <div id="detail-section" class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6 hidden">
       <h2 class="text-xl font-bold text-gray-900 mb-1" id="detail-title">Crop breakdown</h2>
       <p class="text-sm text-gray-500 mb-4" id="detail-subtitle"></p>
-      <div id="detail-chart" style="height:340px;"></div>
+      <div id="detail-chart" style="height:480px;"></div>
     </div>
 
     <!-- Overview -->
@@ -116,96 +138,217 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let currentCategory = "{{ categories[0] }}";
-let currentState = null;
+let charts = {};
+let leafletMap    = null;
+let imageOverlay  = null;
+
+// CSS gradient stops matching the matplotlib colormaps used server-side
+const COLORBAR_CSS = {
+  GHI:   '#ffffb2, #fecc5c 30%, #fd8d3c 55%, #f03b20 75%, #bd0026',
+  PVOUT: '#ffffcc, #c2e699 30%, #78c679 55%, #31a354 75%, #006837',
+  DNI:   '#ffffb2, #fecc5c 30%, #fd8d3c 55%, #f03b20 75%, #bd0026',
+  TEMP:  '#3b4cc0, #6788ee 25%, #f7f7f7 50%, #e8705a 75%, #b40426',
+};
 
 function switchTab(tab, btn) {
   document.getElementById('tab-solar').classList.toggle('hidden', tab !== 'solar');
   document.getElementById('tab-landuse').classList.toggle('hidden', tab !== 'landuse');
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  // nothing extra needed — DOMContentLoaded pre-loads everything
+  if (tab === 'solar' && leafletMap) setTimeout(() => leafletMap.invalidateSize(), 50);
 }
 
+// ── Solar raster overlay (geo-referenced PNG from server) ──────────────────
 async function loadSolarMap(layer) {
-  document.getElementById('solar-loading').style.display = 'flex';
-  document.getElementById('solar-map').style.display = 'none';
+  const loading = document.getElementById('solar-loading');
+  loading.style.display = 'flex';
   try {
-    const res = await fetch(`/api/solar/${layer}`);
-    const fig = await res.json();
-    document.getElementById('solar-loading').style.display = 'none';
-    document.getElementById('solar-map').style.display = 'block';
-    Plotly.react('solar-map', fig.data, {
-      ...fig.layout,
-      paper_bgcolor: 'rgba(0,0,0,0)',
-      margin: {t:0, r:0, b:0, l:0},
-    });
+    const res  = await fetch(`/api/solar/${layer}`);
+    const data = await res.json();
+
+    if (!leafletMap) {
+      leafletMap = L.map('solar-map', { zoomControl: true }).setView([47.5, 13.5], 7);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19,
+      }).addTo(leafletMap);
+      // labels layer on top so country/city names show through
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd', maxZoom: 19, pane: 'shadowPane',
+      }).addTo(leafletMap);
+    }
+
+    if (imageOverlay) leafletMap.removeLayer(imageOverlay);
+    imageOverlay = L.imageOverlay(data.image, data.bounds, { opacity: 0.82, interactive: false })
+      .addTo(leafletMap);
+
+    document.getElementById('colorbar-bar').style.background =
+      `linear-gradient(to right, ${COLORBAR_CSS[layer]})`;
+    document.getElementById('colorbar-title').textContent = data.label;
+    document.getElementById('colorbar-min').textContent = data.min;
+    document.getElementById('colorbar-max').textContent = data.max;
+    document.getElementById('solar-colorbar').classList.remove('hidden');
+
+    loading.style.display = 'none';
   } catch(e) {
-    document.getElementById('solar-loading').innerHTML = '<span class="text-red-500">Error loading map. Is the server running?</span>';
+    loading.innerHTML = '<span class="text-red-500">Error loading map.</span>';
   }
+}
+
+// ── Chart.js bar chart helper ──────────────────────────────────────────────
+function makeBarChart(canvasId, labels, values, onClickLabel, horizontal = false) {
+  if (charts[canvasId]) {
+    charts[canvasId].destroy();
+    delete charts[canvasId];
+  }
+
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+
+  const max = Math.max(...values);
+  const colors = values.map(v => {
+    const t = max > 0 ? v / max : 0;
+    const r = Math.round(22  + t * (21  - 22));
+    const g = Math.round(163 + t * (128 - 163));
+    const b = Math.round(74  + t * (61  - 74));
+    return `rgba(${r},${g},${b},${0.65 + t * 0.30})`;
+  });
+
+  const valueAxis = horizontal ? 'x' : 'y';
+  const labelAxis = horizontal ? 'y' : 'x';
+
+  charts[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        hoverBackgroundColor: colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: horizontal ? 'y' : 'x',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500, easing: 'easeOutQuart' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1f2937',
+          titleColor: '#f9fafb',
+          bodyColor: '#d1fae5',
+          padding: 10,
+          cornerRadius: 8,
+          callbacks: {
+            label: ctx => ` ${(horizontal ? ctx.parsed.x : ctx.parsed.y).toLocaleString('de-AT')} ha`,
+          }
+        }
+      },
+      scales: {
+        [labelAxis]: {
+          grid: { display: false },
+          border: { display: false },
+          ticks: {
+            color: '#6b7280',
+            font: { family: 'Inter, sans-serif', size: horizontal ? 11 : 12 },
+            ...(horizontal ? {} : { maxRotation: 35, minRotation: 15 }),
+          }
+        },
+        [valueAxis]: {
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          border: { display: false },
+          ticks: {
+            color: '#6b7280',
+            font: { family: 'Inter, sans-serif', size: 11 },
+            callback: v => v >= 1000 ? (v/1000).toLocaleString('de-AT') + 'k' : v,
+          }
+        }
+      },
+      onClick: onClickLabel ? (_, elements) => {
+        if (elements.length) onClickLabel(labels[elements[0].index]);
+      } : undefined,
+      onHover: onClickLabel ? (e, elements) => {
+        e.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+      } : undefined,
+    }
+  });
+}
+
+// ── Land use charts ────────────────────────────────────────────────────────
+function getOrCreateCanvas(containerId) {
+  const container = document.getElementById(containerId);
+  let canvas = container.querySelector('canvas');
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.id = containerId + '-canvas';
+    container.appendChild(canvas);
+  }
+  return canvas.id;
 }
 
 async function loadLanduse(category) {
   currentCategory = category;
-  currentState = null;
   document.getElementById('detail-section').classList.add('hidden');
   document.getElementById('landuse-loading').style.display = 'flex';
   document.getElementById('landuse-chart').style.display = 'none';
+
   const res = await fetch(`/api/landuse/${encodeURIComponent(category)}`);
-  const fig = await res.json();
+  const data = await res.json();
+
   document.getElementById('landuse-loading').style.display = 'none';
   document.getElementById('landuse-chart').style.display = 'block';
-  const layout = {
-    ...fig.layout,
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    font: {family: 'Inter, sans-serif'},
-    margin: {t:30, r:20, b:100, l:60},
-  };
-  Plotly.react('landuse-chart', fig.data, layout);
-  document.getElementById('landuse-chart').on('plotly_click', async function(data) {
-    const state = data.points[0].x;
-    await loadDetail(category, state);
-  });
+
+  const cid = getOrCreateCanvas('landuse-chart');
+  makeBarChart(cid, data.labels, data.values, state => loadDetail(category, state));
 }
 
 async function loadDetail(category, state) {
-  currentState = state;
   const res = await fetch(`/api/landuse/${encodeURIComponent(category)}/${encodeURIComponent(state)}`);
-  if (!res.ok) return;
-  const fig = await res.json();
+  if (!res.ok) {
+    document.getElementById('detail-section').classList.remove('hidden');
+    document.getElementById('detail-title').textContent = `${category} — ${state}`;
+    document.getElementById('detail-subtitle').textContent = 'No crop breakdown available for this category.';
+    document.getElementById('detail-chart').style.display = 'none';
+    document.getElementById('detail-section').scrollIntoView({behavior: 'smooth', block: 'start'});
+    return;
+  }
+  const data = await res.json();
+
+  // Filter out null/NaN values
+  const pairs = data.labels.map((l, i) => [l, data.values[i]]).filter(([, v]) => v != null && !isNaN(v));
+  const labels = pairs.map(([l]) => l);
+  const values = pairs.map(([, v]) => v);
+
   document.getElementById('detail-section').classList.remove('hidden');
+  document.getElementById('detail-chart').style.display = 'block';
   document.getElementById('detail-title').textContent = `${category} — ${state}`;
   document.getElementById('detail-subtitle').textContent = 'Area (ha) by crop type. Click another bar to update.';
-  const layout = {
-    ...fig.layout,
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    font: {family: 'Inter, sans-serif'},
-    margin: {t:20, r:20, b:120, l:60},
-  };
-  Plotly.react('detail-chart', fig.data, layout);
-  document.getElementById('detail-section').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+
+  const cid = getOrCreateCanvas('detail-chart');
+  makeBarChart(cid, labels, values, null, true);
+  document.getElementById('detail-section').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
 async function loadOverview() {
   document.getElementById('overview-loading').style.display = 'flex';
   document.getElementById('overview-chart').style.display = 'none';
+
   const res = await fetch('/api/landuse-overview');
-  const fig = await res.json();
+  const data = await res.json();
+
   document.getElementById('overview-loading').style.display = 'none';
   document.getElementById('overview-chart').style.display = 'block';
-  Plotly.react('overview-chart', fig.data, {
-    ...fig.layout,
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-    font: {family: 'Inter, sans-serif'},
-    margin: {t:30, r:20, b:100, l:60},
-  });
+
+  const cid = getOrCreateCanvas('overview-chart');
+  makeBarChart(cid, data.labels, data.values, null);
 }
 
-// Load initial data on page load
 window.addEventListener('DOMContentLoaded', () => {
   loadSolarMap('GHI');
   loadLanduse("{{ categories[0] }}");

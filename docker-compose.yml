@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  agripv:
+    build: .
+    container_name: agriPV-app
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1

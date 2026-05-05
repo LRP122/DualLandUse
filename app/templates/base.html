@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{% block title %}AgroSolar Austria{% endblock %}</title>
+  <title>{% block title %}AgriPV potential calculator{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌾</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
@@ -32,13 +33,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <a href="/" class="flex items-center gap-2">
-          <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/>
-            </svg>
-          </div>
-          <span class="text-white font-bold text-lg tracking-tight">AgroSolar</span>
+          <span class="text-white font-bold text-lg tracking-tight">AgriPV</span>
           <span class="text-brand-400 font-semibold text-sm hidden sm:block">Austria</span>
         </a>
         <div class="flex items-center gap-1">
@@ -63,7 +58,7 @@
   <!-- Footer -->
   <footer class="bg-gray-900 text-gray-400 py-10 mt-16">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <p class="text-sm">© 2026 AgroSolar Austria — University Project</p>
+      <p class="text-sm">©2026 TU Wien Sensor Networks</p>
       <p class="text-sm">Calculations based on peer-reviewed research.
         <a href="/sources" class="text-brand-400 hover:underline">See sources →</a>
       </p>

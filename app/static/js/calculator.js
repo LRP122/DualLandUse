@@ -7,17 +7,15 @@ const state = {
   locationPicked: false,
 };
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let scenarios = null;  // { hot_dry: {...}, cold_humid: {...} } after calculation
 
 const CROP_INFO = {
-  lettuce_herbs:  'High shade tolerance. Yield may slightly improve under partial shade. Low hail risk.',
-  potatoes:       'Medium-high shade tolerance. Yield impact is minimal. Very suitable for agrivoltaics.',
-  wheat_barley:   'Medium shade tolerance. Expect ~15% yield reduction — offset by strong PV revenue.',
-  maize:          'Low shade tolerance (C4 plant). Significant yield loss expected. PV revenue compensates well.',
-  strawberries:   'Shade-tolerant with major hail protection benefit. Often net positive with agrivoltaics.',
-  apples_fruit:   'Good shade tolerance. Hail protection is critical and very valuable for this crop.',
-  grapes:         'Medium tolerance. Site-dependent yield impact. High hail protection value.',
-  vegetables:     'Medium-high tolerance. Slight yield reduction, partially offset by protection benefits.',
+  winter_wheat: 'Medium shade tolerance. Dominant Austrian cereal (~58 dt/ha). Expect yield loss in cold years, offset by PV revenue.',
+  summer_wheat: 'Medium shade tolerance. Lower yields than winter wheat (~44 dt/ha). Same shade behaviour.',
+  potatoes:     'Medium-high shade tolerance. Well suited to agrivoltaics, especially in dry years.',
+  apples:       'Good shade tolerance. Partial shade can reduce sunburn damage on fruit.',
+  vegetables:   'Medium-high tolerance. Small yield reduction partially offset by protection benefits.',
+  maize:        'Not recommended. Maize (C4 plant) has very low shade tolerance — agrivoltaics are not profitable for this crop.',
 };
 
 // ── Map init ───────────────────────────────────────────────────────────────
@@ -36,7 +34,6 @@ function initMap() {
     maxZoom: 19,
   }).addTo(map);
 
-  // Custom green marker icon
   const icon = L.divIcon({
     html: '<div class="pulse-marker"></div>',
     className: '',
@@ -53,7 +50,6 @@ function initMap() {
     state.lat = lat;
     state.lon = lng;
 
-    // Fetch GHI from server
     document.getElementById('loc-ghi').textContent = '…';
     document.getElementById('loc-pvout').textContent = '…';
     document.getElementById('location-info').classList.remove('hidden');
@@ -62,19 +58,19 @@ function initMap() {
       `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
 
     try {
-      const res = await fetch(`/api/ghi-at-location?lat=${lat}&lon=${lng}`);
+      const res  = await fetch(`/api/ghi-at-location?lat=${lat}&lon=${lng}`);
       const data = await res.json();
 
       if (data.ghi !== null && data.ghi !== undefined) {
-        state.ghi = data.ghi;
+        state.ghi   = data.ghi;
         state.pvout = data.pvout;
-        document.getElementById('loc-ghi').textContent = data.ghi.toFixed(2);
+        document.getElementById('loc-ghi').textContent   = data.ghi.toFixed(2);
         document.getElementById('loc-pvout').textContent =
           data.pvout ? data.pvout.toFixed(2) : '—';
       } else {
         state.ghi = 3.5;
         state.pvout = null;
-        document.getElementById('loc-ghi').textContent = '3.50 (avg)';
+        document.getElementById('loc-ghi').textContent   = '3.50 (avg)';
         document.getElementById('loc-pvout').textContent = '—';
         document.getElementById('loc-fallback-notice').classList.remove('hidden');
       }
@@ -93,12 +89,12 @@ function goToStep(n) {
   document.querySelectorAll('.step-card').forEach(c => c.classList.remove('active'));
   document.getElementById(`step-${n}`).classList.add('active');
 
-  // Update step indicators
   document.querySelectorAll('.step-dot').forEach(dot => {
-    const s = parseInt(dot.dataset.step);
+    const s      = parseInt(dot.dataset.step);
     const circle = dot.querySelector('.step-circle');
     const label  = dot.querySelector('.step-label');
-    circle.classList.remove('active-circle', 'done-circle', 'bg-gray-200', 'text-gray-500', 'bg-brand-500', 'text-white', 'bg-green-100', 'text-green-700');
+    circle.classList.remove('active-circle', 'done-circle', 'bg-gray-200', 'text-gray-500',
+                            'bg-brand-500', 'text-white', 'bg-green-100', 'text-green-700');
 
     if (s < n) {
       circle.classList.add('done-circle');
@@ -126,38 +122,41 @@ function updateCropInfo() {
   if (CROP_INFO[crop]) {
     text.textContent = '💡 ' + CROP_INFO[crop];
     box.classList.remove('hidden');
+    box.className = crop === 'maize'
+      ? 'mt-6 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700'
+      : 'mt-6 bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600';
   }
 }
 
 // ── Run calculation ────────────────────────────────────────────────────────
 async function runCalculation() {
-  const area     = parseFloat(document.getElementById('input-area').value) || 10;
-  const crop     = document.getElementById('input-crop').value;
-  const tariff   = parseFloat(document.getElementById('input-tariff').value) || 0.08;
-  const irrigates = document.getElementById('input-irrigates').checked;
+  const area   = parseFloat(document.getElementById('input-area').value) || 10;
+  const crop   = document.getElementById('input-crop').value;
+  const tariff = parseFloat(document.getElementById('input-tariff').value) || 0.08;
 
   goToStep(3);
   document.getElementById('results-loading').classList.remove('hidden');
   document.getElementById('results-content').classList.add('hidden');
+  document.getElementById('results-unprofitable').classList.add('hidden');
 
   try {
     const res = await fetch('/api/calculate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        area_ha: area,
-        crop,
-        ghi: state.ghi || 3.5,
-        irrigates,
-        tariff,
-      }),
+      body: JSON.stringify({ area_ha: area, crop, ghi: state.ghi || 3.5, tariff }),
     });
     const d = await res.json();
 
     document.getElementById('results-loading').classList.add('hidden');
-    document.getElementById('results-content').classList.remove('hidden');
 
-    renderResults(d);
+    if (d.unprofitable) {
+      document.getElementById('up-crop-label').textContent = d.crop_label;
+      document.getElementById('up-reason').textContent     = d.reason;
+      document.getElementById('results-unprofitable').classList.remove('hidden');
+    } else {
+      document.getElementById('results-content').classList.remove('hidden');
+      renderResults(d);
+    }
   } catch (err) {
     document.getElementById('results-loading').innerHTML =
       '<p class="text-red-500 p-8">Error: could not connect to server.</p>';
@@ -166,86 +165,80 @@ async function runCalculation() {
 
 // ── Render results ─────────────────────────────────────────────────────────
 function renderResults(d) {
-  // Score circle
-  const circle = document.getElementById('score-circle');
-  const circumference = 2 * Math.PI * 40; // r=40
-  const scoreEl = document.getElementById('score-number');
-  const labelEl = document.getElementById('score-label');
-  const subtitleEl = document.getElementById('score-subtitle');
+  scenarios = d;
 
-  const colorMap = { green: '#16a34a', amber: '#d97706', red: '#dc2626' };
-  circle.style.stroke = colorMap[d.color] || '#16a34a';
-  scoreEl.className = `text-5xl font-black score-${d.color}`;
-  scoreEl.textContent = d.score;
-  labelEl.className = `text-sm font-bold uppercase tracking-wide score-${d.color}`;
-  labelEl.textContent = d.label + ' Potential';
-  subtitleEl.textContent =
-    `${d.area_ha} ha · ${d.crop_label} · ${d.ghi_daily} kWh/m²/day solar`;
-
-  // Animate ring after a short delay
-  setTimeout(() => {
-    const offset = circumference - (d.score / 100) * circumference;
-    circle.style.strokeDasharray = circumference;
-    circle.style.strokeDashoffset = offset;
-  }, 100);
-
-  // Location / context
   document.getElementById('res-location').textContent =
     state.lat ? `${state.lat.toFixed(3)}°N, ${state.lon.toFixed(3)}°E` : 'Austria (average)';
-  document.getElementById('res-ghi').textContent = d.ghi_daily;
   document.getElementById('res-crop').textContent = d.crop_label;
 
+  selectScenario('hot_dry');
+}
+
+// ── Scenario tab switcher ──────────────────────────────────────────────────
+function selectScenario(key) {
+  if (!scenarios) return;
+  const d = scenarios[key];
+
+  ['hot_dry', 'cold_humid'].forEach(k => {
+    const btn = document.getElementById(`tab-${k}`);
+    if (k === key) {
+      btn.classList.add('bg-white', 'shadow-sm', 'text-gray-900');
+      btn.classList.remove('text-gray-500');
+    } else {
+      btn.classList.remove('bg-white', 'shadow-sm', 'text-gray-900');
+      btn.classList.add('text-gray-500');
+    }
+  });
+
+  // Score ring
+  const circle        = document.getElementById('score-circle');
+  const circumference = 2 * Math.PI * 40;
+  circle.style.strokeDasharray  = circumference;
+  circle.style.strokeDashoffset = circumference;
+  const colorMap = { green: '#16a34a', amber: '#d97706', red: '#dc2626' };
+  circle.style.stroke = colorMap[d.color] || '#16a34a';
+
+  const scoreEl    = document.getElementById('score-number');
+  const labelEl    = document.getElementById('score-label');
+  const subtitleEl = document.getElementById('score-subtitle');
+  scoreEl.className   = `text-5xl font-black score-${d.color}`;
+  scoreEl.textContent = d.score;
+  labelEl.className   = `text-sm font-bold uppercase tracking-wide score-${d.color}`;
+  labelEl.textContent = d.label + ' Potential';
+  subtitleEl.textContent = `${d.area_ha} ha · ${d.crop_label} · ${d.ghi_daily} kWh/m²/day solar`;
+
+  setTimeout(() => {
+    circle.style.strokeDashoffset = circumference - (d.score / 100) * circumference;
+  }, 100);
+
+  document.getElementById('res-ghi').textContent = d.ghi_daily;
+
   // Energy
-  set('res-pv-yield',    d.pv_yield_mwh.toLocaleString());
-  set('res-pv-revenue',  d.pv_revenue.toLocaleString());
-  set('res-pv-kwp',      d.pv_capacity_kwp.toLocaleString());
+  set('res-pv-yield',   d.pv_yield_mwh.toLocaleString());
+  set('res-pv-revenue', d.pv_revenue.toLocaleString());
+  set('res-pv-kwp',     d.pv_capacity_kwp.toLocaleString());
 
   // Financial
   set('res-total-benefit', d.total_benefit.toLocaleString());
-  set('res-payback',  d.payback < 50 ? `${d.payback} years` : '> 50 years');
-  set('res-lcoe',     `${d.lcoe_ct} ct/kWh`);
-  set('res-capex',    `€${d.capex.toLocaleString()}`);
-
-  // LER
-  set('res-ler', d.ler);
-  setTimeout(() => {
-    const lerBar = document.getElementById('ler-bar');
-    lerBar.style.width = `${Math.min((d.ler / 2) * 100, 100)}%`;
-  }, 300);
-
-  // Water
-  if (d.water_saved_m3 > 0) {
-    set('res-water', d.water_saved_m3.toLocaleString());
-    set('res-water-label', `m³ per year saved  ·  ≈ €${d.water_value.toLocaleString()}`);
-  } else {
-    set('res-water', '—');
-    set('res-water-label', 'Enable irrigation above to see savings');
-  }
-  set('res-irr-pct', d.irr_reduction_pct);
+  set('res-water-saved',   d.water_saved_L.toLocaleString());
+  set('res-payback', d.payback < 50 ? `${d.payback} years` : '> 50 years');
+  set('res-lcoe',    `${d.lcoe_ct} ct/kWh`);
+  set('res-capex',   `€${d.capex.toLocaleString()}`);
 
   // Crop yield
   const deltaColor = d.yield_delta_pct >= 0 ? 'text-brand-600' : 'text-red-500';
   document.getElementById('res-yield-delta').className = `text-3xl font-bold mb-1 ${deltaColor}`;
   set('res-yield-delta', (d.yield_delta_pct >= 0 ? '+' : '') + d.yield_delta_pct + '%');
-  set('res-shade', d.shade_tolerance);
+  set('res-base-revenue', `€${d.base_revenue.toLocaleString()}`);
   const deltaAgriVal = d.delta_agri >= 0
     ? `+€${d.delta_agri.toLocaleString()}`
     : `−€${Math.abs(d.delta_agri).toLocaleString()}`;
   const deltaAgriEl = document.getElementById('res-delta-agri');
   deltaAgriEl.textContent = deltaAgriVal;
-  deltaAgriEl.className = `font-semibold ${d.delta_agri >= 0 ? 'text-brand-600' : 'text-red-500'}`;
+  deltaAgriEl.className   = `font-semibold ${d.delta_agri >= 0 ? 'text-brand-600' : 'text-red-500'}`;
 
-  // Hail
-  set('res-hail',     d.hail_value.toLocaleString());
-  set('res-risk-pct', d.risk_pct);
-
-  // Monthly chart
-  renderMonthlyChart(d.monthly_mwh);
-
-  // Benefit breakdown
   renderBenefitBreakdown(d);
 
-  // Animate result cards in
   setTimeout(() => {
     document.querySelectorAll('.result-card').forEach(c => c.classList.add('visible'));
   }, 50);
@@ -256,53 +249,20 @@ function set(id, val) {
   if (el) el.textContent = val;
 }
 
-function renderMonthlyChart(monthly) {
-  const container = document.getElementById('monthly-bars');
-  const labelsEl  = document.getElementById('monthly-labels');
-  const maxVal    = Math.max(...monthly);
-
-  container.innerHTML = '';
-  labelsEl.innerHTML  = '';
-
-  monthly.forEach((val, i) => {
-    const col = document.createElement('div');
-    col.className = 'month-col';
-
-    const bar = document.createElement('div');
-    bar.className = 'month-bar';
-    bar.style.height = '0px';
-    bar.title = `${MONTHS[i]}: ${val} MWh`;
-
-    col.appendChild(bar);
-    container.appendChild(col);
-
-    const lbl = document.createElement('div');
-    lbl.className = 'month-col';
-    lbl.innerHTML = `<span class="month-label">${MONTHS[i]}</span>`;
-    labelsEl.appendChild(lbl);
-
-    setTimeout(() => {
-      bar.style.height = `${(val / maxVal) * 112}px`;
-    }, 100 + i * 40);
-  });
-}
-
 function renderBenefitBreakdown(d) {
   const container = document.getElementById('benefit-breakdown');
   container.innerHTML = '';
 
   const items = [
-    { label: 'PV Revenue',        value: d.pv_revenue,   color: '#eab308' },
-    { label: 'Agri margin change', value: d.delta_agri,   color: d.delta_agri >= 0 ? '#16a34a' : '#ef4444' },
-    { label: 'Water savings',      value: d.water_value,  color: '#3b82f6' },
-    { label: 'Hail protection',    value: d.hail_value,   color: '#f97316' },
+    { label: 'PV Revenue',         value: d.pv_revenue, color: '#eab308' },
+    { label: 'Agri margin change',  value: d.delta_agri, color: d.delta_agri >= 0 ? '#16a34a' : '#ef4444' },
   ];
 
   const maxVal = Math.max(...items.map(i => Math.abs(i.value)), 1);
 
   items.forEach(item => {
     const isNeg = item.value < 0;
-    const row = document.createElement('div');
+    const row   = document.createElement('div');
     row.className = 'benefit-row';
     row.innerHTML = `
       <div class="benefit-label">${item.label}</div>
@@ -328,12 +288,15 @@ function resetCalculator() {
   state.lon = null;
   state.ghi = null;
   state.locationPicked = false;
+  scenarios = null;
 
   if (marker) { map.removeLayer(marker); marker = null; }
   document.getElementById('location-info').classList.add('hidden');
   document.getElementById('loc-fallback-notice').classList.add('hidden');
   document.getElementById('btn-next-1').disabled = true;
   document.querySelectorAll('.result-card').forEach(c => c.classList.remove('visible'));
+  document.getElementById('results-unprofitable').classList.add('hidden');
+  document.getElementById('results-content').classList.add('hidden');
 
   goToStep(1);
 }

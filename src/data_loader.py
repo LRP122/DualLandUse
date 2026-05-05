@@ -1,19 +1,62 @@
+"""
+Solar and landuse data loading and management.
+
+This module handles all data I/O operations:
+- Solar raster data (GHI, PVOUT, DNI, TEMP)
+- Austrian landuse statistics by state and crop type
+"""
+
+import os
 import matplotlib
 matplotlib.use('Agg')
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
+# ── DATA PATHS ──────────────────────────────────────────────────────────────────
 
-PATH_TO_DATASETS = "/Users/luis/Desktop/Master/SS26/SensorNetworks/AgripholtiacsProject/References/datasets"
-SOLAR_DIR = PATH_TO_DATASETS + "/Solar"
-LANDUSE_DIR = PATH_TO_DATASETS + "/Landuse"
+PATH_TO_DATASETS = os.path.join(os.path.dirname(__file__), "..", "References", "datasets")
+SOLAR_DIR = os.path.join(PATH_TO_DATASETS, "Solar")
+LANDUSE_DIR = os.path.join(PATH_TO_DATASETS, "Landuse")
 
-DATASET_TO_TEST = "landuse"
-
+# Solar data layers available from raster files
 LAYERS = ["GHI", "PVOUT", "DNI", "TEMP"]
 
+# ── LANDUSE DATA CONSTANTS ──────────────────────────────────────────────────────
+
+LANDUSE_CATEGORIES = [
+    "Cereals", "Protein crops", "Root crops", "Oilseeds",
+    "Forage cropping", "Industrial crops", "Other arable crops",
+    "House & kitchen gardens", "Permanent crops",
+    "Grassland intensive", "Grassland extensive",
+    "Forest", "Forestry area", "Unproductive areas"
+]
+
+# Maps categories that have a detail CSV to their filename
+CATEGORY_DETAIL_FILE = {
+    "Cereals":           "Cereals.csv",
+    "Protein crops":     "ProteinCrops.csv",
+    "Root crops":        "RootCrops.csv",
+    "Oilseeds":          "OilSeeds.csv",
+    "Forage cropping":   "ForageCrops.csv",
+    "Industrial crops":  "IndustrialCrops.csv",
+    "Other arable crops":"Others.csv",
+}
+
+
+# ── SOLAR DATA FUNCTIONS ────────────────────────────────────────────────────────
+
 def load_solar_data(reduced_data):
+    """Load solar data from raster files.
+
+    Combines GHI, PVOUT, DNI, and TEMP raster data into a unified dataframe.
+    All rasters are reprojected to match the GHI grid.
+
+    Args:
+        reduced_data: If True, returns every 20th point (for faster loading)
+
+    Returns:
+        pd.DataFrame: Solar data with columns [lon, lat, GHI, PVOUT, DNI, TEMP]
+    """
     import rasterio
     import rasterio.transform
     from rasterio.vrt import WarpedVRT
@@ -47,25 +90,8 @@ def load_solar_data(reduced_data):
 
     return df
 
-LANDUSE_CATEGORIES = [
-    "Cereals", "Protein crops", "Root crops", "Oilseeds",
-    "Forage cropping", "Industrial crops", "Other arable crops",
-    "House & kitchen gardens", "Permanent crops",
-    "Grassland intensive", "Grassland extensive",
-    "Forest", "Forestry area", "Unproductive areas"
-]
 
-# Maps categories that have a detail CSV to their filename
-CATEGORY_DETAIL_FILE = {
-    "Cereals":           "Cereals.csv",
-    "Protein crops":     "ProteinCrops.csv",
-    "Root crops":        "RootCrops.csv",
-    "Oilseeds":          "OilSeeds.csv",
-    "Forage cropping":   "ForageCrops.csv",
-    "Industrial crops":  "IndustrialCrops.csv",
-    "Other arable crops":"Others.csv",
-}
-
+# ── LANDUSE DATA FUNCTIONS ──────────────────────────────────────────────────────
 
 def get_total_by_category():
     """Return total area (ha) per land-use category summed across all Austrian states."""
@@ -82,6 +108,14 @@ def get_total_by_category():
 
 
 def get_production_by_state(category):
+    """Return area by state for a given landuse category.
+
+    Args:
+        category: Land use category name
+
+    Returns:
+        pd.DataFrame: Columns [state, area_ha]
+    """
     col_index = LANDUSE_CATEGORIES.index(category)
     area_col = 1 + col_index * 4  # area columns are every 4th, starting at 1
 
@@ -95,7 +129,15 @@ def get_production_by_state(category):
 
 
 def get_crop_detail_by_state(category, state):
-    """Return the sub-crop breakdown for a given category and state name."""
+    """Return the sub-crop breakdown for a given category and state name.
+
+    Args:
+        category: Land use category
+        state: Austrian state name
+
+    Returns:
+        pd.DataFrame: Columns [crop, area_ha]
+    """
     filename = CATEGORY_DETAIL_FILE.get(category)
     if filename is None:
         return pd.DataFrame()
@@ -114,7 +156,3 @@ def get_crop_detail_by_state(category, state):
 
     areas = pd.to_numeric(state_row.iloc[0, 1::4], errors="coerce").tolist()
     return pd.DataFrame({"crop": crop_names, "area_ha": areas})
-
-
-if __name__ == "__main__":
-    pass

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Calculator — AgroSolar Austria{% endblock %}
+{% block title %}Calculator — AgriPV Austria{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -10,8 +10,6 @@
   .result-card { opacity: 0; transform: translateY(12px); transition: opacity .4s ease, transform .4s ease; }
   .result-card.visible { opacity: 1; transform: translateY(0); }
   .score-ring { stroke-dasharray: 251.2; stroke-dashoffset: 251.2; transition: stroke-dashoffset 1.2s ease; }
-  .bar-fill { width: 0; transition: width 1s ease; }
-  .monthly-bar { height: 0; transition: height 0.6s ease; }
 </style>
 {% endblock %}
 
@@ -45,7 +43,7 @@
   <!-- ── Step 1: Location ── -->
   <div class="step-card active bg-white rounded-2xl shadow-sm border border-gray-200 p-8" id="step-1">
     <h2 class="text-2xl font-bold text-gray-900 mb-2">Select your location</h2>
-    <p class="text-gray-500 mb-6">Click anywhere on the map to set your farm location. We'll look up the local solar irradiance.</p>
+    <p class="text-gray-500 mb-6">Select your farm location on the map. We will fetch the solar data for your location.</p>
 
     <div id="location-map" class="border border-gray-200 shadow-inner mb-6"></div>
 
@@ -66,12 +64,10 @@
           </div>
         </div>
       </div>
+      <p id="loc-fallback-notice" class="hidden text-xs text-amber-600 mt-2">
+        No solar data found for this location — using Austrian average (3.5 kWh/m²/day).
+      </p>
     </div>
-
-    <div id="loc-fallback-notice" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-700">
-      No solar data at that exact pixel — using the Austrian average of 3.5 kWh/m²/day.
-    </div>
-
     <div class="flex justify-end">
       <button id="btn-next-1" onclick="goToStep(2)"
               class="btn-primary disabled:opacity-40 disabled:cursor-not-allowed" disabled>
@@ -83,15 +79,14 @@
   <!-- ── Step 2: Farm Details ── -->
   <div class="step-card bg-white rounded-2xl shadow-sm border border-gray-200 p-8" id="step-2">
     <h2 class="text-2xl font-bold text-gray-900 mb-2">Farm details</h2>
-    <p class="text-gray-500 mb-8">Default values are Austrian averages — feel free to adjust.</p>
+    <p class="text-gray-500 mb-8">Replace the default values with your actual farm values.</p>
 
     <div class="grid sm:grid-cols-2 gap-6">
       <!-- Farm area -->
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2">Farm area (hectares)</label>
-        <input type="number" id="input-area" value="10" min="0.1" step="0.1"
+        <input type="number" id="input-area" value="1" min="0.1" step="0.1"
                class="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:ring-2 focus:ring-brand-400 focus:border-transparent outline-none transition"/>
-        <p class="text-xs text-gray-400 mt-1">Austrian average farm: ~19 ha</p>
       </div>
 
       <!-- Crop type -->
@@ -99,14 +94,12 @@
         <label class="block text-sm font-semibold text-gray-700 mb-2">Primary crop</label>
         <select id="input-crop"
                 class="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:ring-2 focus:ring-brand-400 focus:border-transparent outline-none transition bg-white">
-          <option value="wheat_barley">Wheat / Barley</option>
-          <option value="maize">Maize</option>
+          <option value="winter_wheat">Winter Wheat</option>
+          <option value="summer_wheat">Summer Wheat</option>
           <option value="potatoes">Potatoes</option>
           <option value="vegetables">Vegetables</option>
-          <option value="lettuce_herbs">Lettuce / Herbs</option>
-          <option value="strawberries">Strawberries</option>
-          <option value="apples_fruit">Apples / Tree Fruit</option>
-          <option value="grapes">Grapes / Vines</option>
+          <option value="apples">Apples</option>
+          <option value="maize">Maize</option>
         </select>
       </div>
 
@@ -117,24 +110,9 @@
                class="w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:ring-2 focus:ring-brand-400 focus:border-transparent outline-none transition"/>
         <p class="text-xs text-gray-400 mt-1">Austrian OeMAG rate: ~€0.07–0.10/kWh</p>
       </div>
-
-      <!-- Irrigation -->
-      <div class="flex items-center">
-        <label class="relative inline-flex items-center cursor-pointer gap-4">
-          <div class="relative">
-            <input type="checkbox" id="input-irrigates" class="sr-only peer"/>
-            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:bg-brand-500 transition"></div>
-            <div class="absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full transition-transform peer-checked:translate-x-5 shadow-sm"></div>
-          </div>
-          <div>
-            <p class="text-sm font-semibold text-gray-700">I currently irrigate</p>
-            <p class="text-xs text-gray-400">Enables water savings calculation</p>
-          </div>
-        </label>
-      </div>
     </div>
 
-    <!-- Crop shade info box -->
+    <!-- Crop info box -->
     <div id="crop-info-box" class="mt-6 bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600 hidden">
       <p id="crop-info-text"></p>
     </div>
@@ -159,8 +137,34 @@
       <p class="text-gray-500">Calculating your potential…</p>
     </div>
 
+    <!-- Maize / unprofitable notice -->
+    <div id="results-unprofitable" class="hidden bg-white rounded-2xl shadow-sm border border-red-200 p-10 text-center">
+      <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+      </div>
+      <h3 class="text-xl font-bold text-gray-900 mb-2">Not suitable for agrivoltaics</h3>
+      <p class="text-red-700 font-semibold mb-3" id="up-crop-label"></p>
+      <p class="text-gray-500 text-sm max-w-md mx-auto mb-8" id="up-reason"></p>
+      <button onclick="resetCalculator()" class="btn-secondary text-sm">← Try a different crop</button>
+    </div>
+
     <!-- Results content -->
     <div id="results-content" class="hidden">
+
+      <!-- Scenario tabs -->
+      <div class="flex bg-gray-100 rounded-xl p-1 mb-6 gap-1">
+        <button id="tab-hot_dry" onclick="selectScenario('hot_dry')"
+                class="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all bg-white shadow-sm text-gray-900">
+          Hot year
+        </button>
+        <button id="tab-cold_humid" onclick="selectScenario('cold_humid')"
+                class="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all text-gray-500">
+          Cold year
+        </button>
+      </div>
 
       <!-- Potential score hero -->
       <div class="result-card bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6 text-center">
@@ -228,49 +232,13 @@
               <span class="font-semibold" id="res-lcoe">—</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-500">System cost (est.)</span>
+              <span class="text-gray-500">System cost</span>
               <span class="font-semibold" id="res-capex">—</span>
             </div>
           </div>
         </div>
 
-        <!-- LER -->
-        <div class="result-card bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <div class="flex items-center gap-2 mb-3">
-            <div class="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center">
-              <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-              </svg>
-            </div>
-            <span class="text-sm font-semibold text-gray-600">Land Efficiency (LER)</span>
-          </div>
-          <p class="text-3xl font-bold text-gray-900 mb-1" id="res-ler">—</p>
-          <p class="text-sm text-gray-500 mb-4">Land Equivalent Ratio</p>
-          <div class="relative h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div class="absolute left-0 top-0 h-full bg-brand-500 rounded-full bar-fill" id="ler-bar"></div>
-          </div>
-          <p class="text-xs text-gray-400 mt-2">LER &gt; 1.0 = more efficient than separate use</p>
-        </div>
-
-        <!-- Water savings -->
-        <div class="result-card bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <div class="flex items-center gap-2 mb-3">
-            <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-              </svg>
-            </div>
-            <span class="text-sm font-semibold text-gray-600">Water Savings</span>
-          </div>
-          <p class="text-3xl font-bold text-gray-900 mb-1" id="res-water">—</p>
-          <p class="text-sm text-gray-500 mb-3" id="res-water-label">m³ per year</p>
-          <div class="bg-blue-50 rounded-lg px-3 py-2">
-            <p class="text-sm text-blue-700"><span id="res-irr-pct">—</span>% less irrigation needed</p>
-          </div>
-          <p class="text-xs text-gray-400 mt-2">Source: Elamri et al. 2018</p>
-        </div>
-
-        <!-- Crop impact -->
+        <!-- Crop yield impact -->
         <div class="result-card bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div class="flex items-center gap-2 mb-3">
             <div class="w-8 h-8 bg-lime-50 rounded-lg flex items-center justify-center">
@@ -284,47 +252,35 @@
           <p class="text-sm text-gray-500 mb-3">yield change under panels</p>
           <div class="text-sm space-y-1">
             <div class="flex justify-between">
-              <span class="text-gray-500">Shade tolerance</span>
-              <span class="font-semibold" id="res-shade">—</span>
+              <span class="text-gray-500">Base crop revenue</span>
+              <span class="font-semibold" id="res-base-revenue">—</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-500">Agri margin change</span>
+              <span class="text-gray-500">Agricultural margin change</span>
               <span class="font-semibold" id="res-delta-agri">—</span>
             </div>
           </div>
         </div>
 
-        <!-- Hail protection -->
+        <!-- Water savings -->
         <div class="result-card bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <div class="flex items-center gap-2 mb-3">
-            <div class="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center">
-              <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+            <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
               </svg>
             </div>
-            <span class="text-sm font-semibold text-gray-600">Hail & Risk Protection</span>
+            <span class="text-sm font-semibold text-gray-600">Water Savings</span>
           </div>
-          <p class="text-3xl font-bold text-gray-900 mb-1">€<span id="res-hail">—</span></p>
-          <p class="text-sm text-gray-500 mb-3">estimated annual protection value</p>
-          <div class="bg-orange-50 rounded-lg px-3 py-2">
-            <p class="text-sm text-orange-700">Revenue risk floor lifted by <span id="res-risk-pct" class="font-bold">—</span>%</p>
+          <p class="text-3xl font-bold text-blue-700 mb-1" id="res-water-saved">—</p>
+          <p class="text-sm text-gray-500 mb-3">litres saved per year</p>
+          <div class="bg-blue-50 rounded-lg px-3 py-2">
+            <p class="text-sm text-blue-700">Panel shade reduces evapotranspiration</p>
           </div>
-          <p class="text-xs text-gray-400 mt-2">Source: Cuppari et al. 2021</p>
+          <p class="text-xs text-gray-400 mt-2">Source: Elamri et al. 2018</p>
         </div>
 
       </div><!-- end metrics grid -->
-
-      <!-- Monthly PV chart -->
-      <div class="result-card bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-        <h3 class="text-lg font-bold text-gray-900 mb-1">Monthly Energy Production</h3>
-        <p class="text-sm text-gray-500 mb-6">Estimated MWh output by month</p>
-        <div class="flex items-end gap-1.5 h-32" id="monthly-bars">
-          <!-- filled by JS -->
-        </div>
-        <div class="flex gap-1.5 mt-1 text-xs text-gray-400" id="monthly-labels">
-          <!-- filled by JS -->
-        </div>
-      </div>
 
       <!-- Revenue breakdown bar -->
       <div class="result-card bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
@@ -334,8 +290,7 @@
 
       <!-- Start over -->
       <div class="text-center mt-8">
-        <button onclick="resetCalculator()"
-                class="btn-secondary text-sm">
+        <button onclick="resetCalculator()" class="btn-secondary text-sm">
           ← Calculate for a different farm
         </button>
       </div>
