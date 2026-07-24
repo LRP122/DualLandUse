@@ -208,6 +208,7 @@
             <p class="text-sm font-semibold text-yellow-800">≈ €<span id="res-pv-revenue">—</span>/yr revenue</p>
           </div>
           <p class="text-xs text-gray-400 mt-2"><span id="res-pv-kwp">—</span> kWp system capacity</p>
+          <p class="text-xs text-gray-400 mt-1">Includes a performance ratio of 0.8 to account for inverter, wiring and soiling losses between rated GHI and delivered energy.</p>
         </div>
 
         <!-- Financial -->
@@ -232,10 +233,17 @@
               <span class="font-semibold" id="res-lcoe">—</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-500">System cost</span>
+              <span class="text-gray-500">System cost (Capex)</span>
               <span class="font-semibold" id="res-capex">—</span>
             </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">O&amp;M cost (Opex/yr)</span>
+              <span class="font-semibold" id="res-opex">—</span>
+            </div>
           </div>
+          <p class="text-xs text-gray-400 mt-3">
+            Total benefit = PV revenue − Opex + agricultural margin change. It reflects both the solar system's own profit and the crop revenue gained or lost to panel shading.
+          </p>
         </div>
 
         <!-- Crop yield impact -->

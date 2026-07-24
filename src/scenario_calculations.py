@@ -40,8 +40,8 @@ IRRIGATION_REDUCTION = 0.2
 MOUNTING_LAND_LOSS = 0.1
 
 # Used for website
-SCORE_HIGH   = 70
-SCORE_MEDIUM = 45
+SCORE_HIGH   = 55
+SCORE_MEDIUM = 35
 
 # Scenarios differ only in which crop yield delta is applied.
 SCENARIOS = {
@@ -57,6 +57,7 @@ def _run_scenario(area_ha, cp, ghi, tariff, climate):
     # GHI (kWh/m²/day) numerically equals peak sun hours/day when panels are rated at 1 kW/m²
 
     pv_capacity_kwp = area_ha * PV_CAPACITY_PER_HA
+    # Account for loss in GHI 0.8
     pv_yield_mwh    = pv_capacity_kwp * ghi * 365 / 1000 * 0.8
     pv_revenue      = pv_yield_mwh * 1000 * tariff
 
@@ -68,8 +69,8 @@ def _run_scenario(area_ha, cp, ghi, tariff, climate):
 
     pv_yield_kwh = pv_yield_mwh * 1000
     capex        = pv_capacity_kwp * CAPEX_PER_KWP
-    opex_annual  = LCOE_OPEX / 100 * pv_yield_kwh
-    net_annual   = pv_revenue - opex_annual
+    opex_annual  = (LCOE_OPEX * 0.01) * pv_yield_kwh
+    net_annual   = pv_revenue - opex_annual + delta_agri
     payback      = capex / net_annual if net_annual > 0 else 999
 
     # Water savings (Elamri et al. 2018)
@@ -107,9 +108,10 @@ def _run_scenario(area_ha, cp, ghi, tariff, climate):
         "yield_dt_ha":     cp["yield_dt_ha"],
         "price_dt":        cp["price_dt"],
         "capex":           round(capex),
+        "opex_annual":     round(opex_annual),
         "lcoe_ct":         round(LCOE_CAPEX + LCOE_OPEX, 2),
         "payback":         round(payback, 1),
-        "total_benefit":   round(pv_revenue + delta_agri),
+        "total_benefit":   round(net_annual),
         "area_ha":         area_ha,
         "ghi_daily":       round(ghi, 2),
         "water_saved_L":   water_saved_L,

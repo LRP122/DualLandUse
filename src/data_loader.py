@@ -123,7 +123,9 @@ def get_production_by_state(category):
     # rows 3–11 are the 9 Austrian states (row 12 is "Not classifiable", skip it)
     state_rows = df.iloc[3:12]
     states = state_rows.iloc[:, 0].str.replace(r"\s*<[^>]+>", "", regex=True)
-    areas = pd.to_numeric(state_rows.iloc[:, area_col], errors="coerce")
+    # "-" in the source CSV means no area recorded for that state/category — treat as 0,
+    # not NaN, since NaN serializes to an invalid `NaN` JSON token and breaks the chart.
+    areas = pd.to_numeric(state_rows.iloc[:, area_col], errors="coerce").fillna(0)
 
     return pd.DataFrame({"state": states.values, "area_ha": areas.values})
 

@@ -224,6 +224,7 @@ function selectScenario(key) {
   set('res-payback', d.payback < 50 ? `${d.payback} years` : '> 50 years');
   set('res-lcoe',    `${d.lcoe_ct} ct/kWh`);
   set('res-capex',   `€${d.capex.toLocaleString()}`);
+  set('res-opex',    `€${d.opex_annual.toLocaleString()}`);
 
   // Crop yield
   const deltaColor = d.yield_delta_pct >= 0 ? 'text-brand-600' : 'text-red-500';
@@ -255,6 +256,7 @@ function renderBenefitBreakdown(d) {
 
   const items = [
     { label: 'PV Revenue',         value: d.pv_revenue, color: '#eab308' },
+    { label: 'O&M cost (Opex)',    value: -d.opex_annual, color: '#ef4444' },
     { label: 'Agri margin change',  value: d.delta_agri, color: d.delta_agri >= 0 ? '#16a34a' : '#ef4444' },
   ];
 
