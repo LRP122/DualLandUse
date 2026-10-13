@@ -6,12 +6,8 @@ ENV PYTHONUNBUFFERED=1 \
     FLASK_APP=app/app.py \
     FLASK_ENV=development
 
-# Install system dependencies required for rasterio, gdal, and pyproj
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gdal-bin \
-    libgdal-dev \
-    libproj-dev \
-    libgeos-dev \
+# rasterio wheels bundle GDAL/PROJ but need libexpat at runtime
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory

@@ -36,11 +36,14 @@ IRRIGATION_LITERS_PER_HA = 7_000
 # Elamri et al. 2018 — agrivoltaic shade reduces crop evapotranspiration by ~20%
 IRRIGATION_REDUCTION = 0.2
 
+# Used only when PVOUT is unavailable for a location
+FALLBACK_PERFORMANCE_RATIO = 0.8
+
 # Frauenhofer
 MOUNTING_LAND_LOSS = 0.1
 
 # Used for website
-SCORE_HIGH   = 55
+SCORE_HIGH   = 65
 SCORE_MEDIUM = 35
 
 # Scenarios differ only in which crop yield delta is applied.
@@ -49,16 +52,15 @@ SCENARIOS = {
     "cold_humid": {"label": "Cold & Humid Year", "delta_key": "delta_cold"},
 }
 
-def _run_scenario(area_ha, cp, ghi, tariff, climate):
+def _run_scenario(area_ha, cp, ghi, pvout, tariff, climate):
     s         = SCENARIOS[climate]
     adj_delta = cp[s["delta_key"]]
 
-    # PV energy: kWp × GHI_daily × 365 × PR / 1000 → MWh/year
-    # GHI (kWh/m²/day) numerically equals peak sun hours/day when panels are rated at 1 kW/m²
+    # PV energy: kWp × PVOUT_daily × 365 / 1000 → MWh/year
+    # PVOUT (kWh/kWp/day) from Global Solar Atlas already includes system losses and panel tilt.
 
     pv_capacity_kwp = area_ha * PV_CAPACITY_PER_HA
-    # Account for loss in GHI 0.8
-    pv_yield_mwh    = pv_capacity_kwp * ghi * 365 / 1000 * 0.8
+    pv_yield_mwh    = pv_capacity_kwp * pvout * 365 / 1000
     pv_revenue      = pv_yield_mwh * 1000 * tariff
 
     base_revenue    = cp["yield_dt_ha"] * cp["price_dt"] * area_ha
@@ -114,14 +116,17 @@ def _run_scenario(area_ha, cp, ghi, tariff, climate):
         "total_benefit":   round(net_annual),
         "area_ha":         area_ha,
         "ghi_daily":       round(ghi, 2),
+        "pvout_daily":     round(pvout, 2),
         "water_saved_L":   water_saved_L,
     }
 
 
-def calculate_agrivoltaic_scenario(area_ha, crop_key, ghi, tariff):
+def calculate_agrivoltaic_scenario(area_ha, crop_key, ghi, tariff, pvout=None):
     area_ha = max(float(area_ha), 0.1)
     ghi     = float(ghi)
     tariff  = float(tariff)
+    # Fall back to GHI × performance ratio when no PVOUT is available for the location
+    pvout   = float(pvout) if pvout else ghi * FALLBACK_PERFORMANCE_RATIO
     cp      = CROP_PARAMS.get(crop_key, CROP_PARAMS["winter_wheat"])
 
     if crop_key == "maize":
@@ -136,6 +141,6 @@ def calculate_agrivoltaic_scenario(area_ha, crop_key, ghi, tariff):
     return {
         "unprofitable": False,
         "crop_label":   cp["label"],
-        "hot_dry":      _run_scenario(area_ha, cp, ghi, tariff, "hot_dry"),
-        "cold_humid":   _run_scenario(area_ha, cp, ghi, tariff, "cold_humid"),
+        "hot_dry":      _run_scenario(area_ha, cp, ghi, pvout, tariff, "hot_dry"),
+        "cold_humid":   _run_scenario(area_ha, cp, ghi, pvout, tariff, "cold_humid"),
     }

@@ -50,7 +50,6 @@ function initMap() {
     state.lat = lat;
     state.lon = lng;
 
-    document.getElementById('loc-ghi').textContent = '…';
     document.getElementById('loc-pvout').textContent = '…';
     document.getElementById('location-info').classList.remove('hidden');
     document.getElementById('loc-fallback-notice').classList.add('hidden');
@@ -64,19 +63,18 @@ function initMap() {
       if (data.ghi !== null && data.ghi !== undefined) {
         state.ghi   = data.ghi;
         state.pvout = data.pvout;
-        document.getElementById('loc-ghi').textContent   = data.ghi.toFixed(2);
         document.getElementById('loc-pvout').textContent =
           data.pvout ? data.pvout.toFixed(2) : '—';
       } else {
         state.ghi = 3.5;
         state.pvout = null;
-        document.getElementById('loc-ghi').textContent   = '3.50 (avg)';
-        document.getElementById('loc-pvout').textContent = '—';
+        document.getElementById('loc-pvout').textContent = '2.80 (avg)';
         document.getElementById('loc-fallback-notice').classList.remove('hidden');
       }
     } catch (_) {
       state.ghi = 3.5;
-      document.getElementById('loc-ghi').textContent = '3.50 (avg)';
+      state.pvout = null;
+      document.getElementById('loc-pvout').textContent = '2.80 (avg)';
     }
 
     state.locationPicked = true;
@@ -143,7 +141,7 @@ async function runCalculation() {
     const res = await fetch('/api/calculate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ area_ha: area, crop, ghi: state.ghi || 3.5, tariff }),
+      body: JSON.stringify({ area_ha: area, crop, ghi: state.ghi || 3.5, pvout: state.pvout, tariff }),
     });
     const d = await res.json();
 
@@ -205,13 +203,13 @@ function selectScenario(key) {
   scoreEl.textContent = d.score;
   labelEl.className   = `text-sm font-bold uppercase tracking-wide score-${d.color}`;
   labelEl.textContent = d.label + ' Potential';
-  subtitleEl.textContent = `${d.area_ha} ha · ${d.crop_label} · ${d.ghi_daily} kWh/m²/day solar`;
+  subtitleEl.textContent = `${d.area_ha} ha · ${d.crop_label} · ${d.pvout_daily} kWh/kWp/day PV output`;
 
   setTimeout(() => {
     circle.style.strokeDashoffset = circumference - (d.score / 100) * circumference;
   }, 100);
 
-  document.getElementById('res-ghi').textContent = d.ghi_daily;
+  document.getElementById('res-pvout').textContent = d.pvout_daily;
 
   // Energy
   set('res-pv-yield',   d.pv_yield_mwh.toLocaleString());
@@ -289,6 +287,7 @@ function resetCalculator() {
   state.lat = null;
   state.lon = null;
   state.ghi = null;
+  state.pvout = null;
   state.locationPicked = false;
   scenarios = null;
 

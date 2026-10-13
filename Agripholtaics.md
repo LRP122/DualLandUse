@@ -26,73 +26,89 @@ This process is becoming more and more important due to a number of reasons:
 
 ## Project: Agrivoltaic Potential Calculator — Web Application
 
-The project consists of a website with different functionality.
+A Flask web application with four pages: a landing page, data maps, the calculator, and a sources page.
+It runs in Docker (see [HowToRun.md](HowToRun.md)).
 
-# Data maps
+### Data maps (`/map`)
 
-The data maps show climatic and agricultural data for Austria.
-This includes GHI, temperatures, crop distribution in the different states, and further.
+Climatic and agricultural data for Austria:
 
-# Agrivoltaics calculator
+- **Solar resource map:** Leaflet overlay of the GHI, PVOUT, DNI and temperature rasters (GeoTIFF, rendered server-side to PNG and cached).
+- **Land use by state:** Chart.js bar charts of area per land-use category and Austrian state.
+- **Crop breakdown:** drill-down into sub-crops for a selected category and state.
+- **Total land use:** overview of agricultural categories (forest, grassland and unproductive areas are excluded).
 
-This is the heart of the application, and is meant as a base for farmers to find out if a solar system is interesting and feasible for them.
-The workflow is described below in more detail. Detailed calculations and financial numbers can help drive interest.
+### Agrivoltaics calculator (`/calculator`)
 
-# Sources and further information
-
-The sources section entails all the sources used for this project, and can help as a base for further information.
-
-### User Input Flow Calculator
+The heart of the application, meant as a first feasibility check for farmers. It has three steps:
 
 **Step 1 — Location**
-- Click on a map of Austria (Leaflet.js) or enter address/postal code
-- App auto-fills: GHI (kWh/m²/yr), average temperature, annual precipitation, hail risk index
+- Click on a Leaflet/OpenStreetMap map of Austria.
+- The app looks up GHI and PV output (PVOUT) from the raster data at that point.
+- If the point has no data, it falls back to 3.5 kWh/m²/day and shows a notice.
 
-**Step 2 — Farm Details**
-- Total area (ha)
-- Crop type (dropdown with Austrian staples: wheat, maize, potatoes, vegetables, grapes, berries, mixed)
-- Current annual yield (t/ha) and market price (€/t) — pre-filled with Austrian averages from Agraratlas, editable
-- Whether the farmer currently irrigates (yes/no, how much)
+**Step 2 — Farm details**
+- Farm area (ha)
+- Primary crop: winter wheat, summer wheat, potatoes, apples, vegetables, maize
+- Feed-in tariff (€/kWh, default 0.08)
 
-**Step 3 — System Configuration** *(optional, advanced)*
-- Panel coverage ratio (default: 15–20% — the half-density standard)
-- System size (kWp) or auto-calculated from area
-- Electricity use: self-consumption vs. full feed-in
+**Step 3 — Results**
+- Two scenarios in tabs: *Hot & dry year* and *Cold & humid year*
+- Viability score (0–100) with a High / Medium / Low rating
+- Energy: installed capacity (kWp), yield (MWh/yr), PV revenue (€/yr)
+- Financials: CAPEX, annual O&M, LCOE, annual net benefit, payback period
+- Crop impact: yield change (%) and change in agricultural revenue compared to a conventional field
+- Estimated water savings from partial shade
+- Annual benefit breakdown (PV revenue, O&M cost, agricultural margin change)
+- Maize is reported as unsuitable (low shade tolerance) instead of being calculated
 
-**Step 4 — Results Dashboard**
-- Summary card: "Your land has **High / Medium / Low** agrivoltaic potential"
-- Energy yield: X MWh/yr → €X/yr revenue
-- LER score: gauge showing land efficiency gain
-- Water savings: X m³/yr → €X saved in irrigation
-- Crop yield impact: +/- X% by crop type
-- Financial summary: annual net benefit (€), payback period (years), break-even tariff
-- Hail/weather risk score: risk reduction value
-- Downloadable PDF report
+### Calculation model (`src/scenario_calculations.py`)
 
----
+| Item | Assumption |
+|---|---|
+| PV capacity | 600 kWp/ha (Fraunhofer ISE 2024, overhead system > 4 m) |
+| PV yield | kWp × PVOUT × 365 / 1000 (PVOUT already includes losses and tilt); falls back to GHI × 0.8 if PVOUT is missing |
+| CAPEX | 1,105 €/kWp (sum of module, inverter, mounting, electrics, planning, grid, installation, other) |
+| O&M | 1.26 ct/kWh; LCOE shown as 6.88 + 1.26 ct/kWh (Fraunhofer ISE 2024) |
+| Land loss | 10 % of cropland lost to mounting structures |
+| Crop yield change | Per-crop delta for hot/dry and cold/humid years; yield and price from Austrian averages |
+| Water savings | 20 % less irrigation (Elamri et al. 2018), scaled ×1.2 (hot/dry) or ×0.8 (cold/humid) |
+| Score | GHI (0–40) + crop delta (0–30) + payback (0–30); High ≥ 55, Medium ≥ 35 |
 
-### Tech Stack
+The model is a simplified estimate. It ignores discounting, panel degradation, subsidies and self-consumption.
+
+### Sources and further information (`/sources`)
+
+Lists the papers, reports and datasets behind the numbers.
+
+### Tech stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React + TypeScript |
-| Styling | Tailwind CSS |
+| Frontend | Server-rendered Jinja2 templates, vanilla JavaScript |
+| Styling | Tailwind CSS (CDN) |
 | Map | Leaflet.js + OpenStreetMap tiles |
-| Charts | Recharts or Chart.js |
-| Backend | Python (Flask or FastAPI) |
-| Container | Docker |
+| Charts | Chart.js |
+| Backend | Python, Flask |
+| Data processing | rasterio, pandas, numpy, matplotlib |
+| Container | Docker, Docker Compose |
 
----
+The frontend loads Tailwind, Leaflet, Chart.js, fonts and map tiles from CDNs, so an internet connection is required.
 
-
-### Data Sources to Integrate
+### Data sources used
 
 | Dataset | Purpose | Source |
 |---|---|---|
-| GHI / solar irradiance | Energy yield calculation | Solar resource maps & GIS data SOLARGIS |
-| Agricultural land parcels | Validate land is farmland | Agraratlas Austria / INVEKOS |
-| Crop statistics Austria | Default yield/price per crop | Statistik Austria, AMA |
-| Electricity tariffs Austria | Revenue calculation | E-Control Austria |
+| GHI, PVOUT, DNI, temperature rasters | Energy yield calculation and solar map | Global Solar Atlas / Solargis (`References/datasets/Solar`) |
+| Land use by state and crop | Land use charts | Statistik Austria (`References/datasets/Landuse`) |
+| Crop yields, prices, shade effects | Agricultural impact | Fraunhofer ISE, Austrian agriculture portals, literature (see Sources page) |
+
+### Not implemented (ideas)
+
+- Address or postal code search
+- Hail and weather risk score, LER gauge, PDF report
+- Advanced system configuration (coverage ratio, self-consumption)
+- Parcel validation against Agraratlas / INVEKOS, tariffs from E-Control
 
 ### What to improve
 

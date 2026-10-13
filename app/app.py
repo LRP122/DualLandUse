@@ -191,6 +191,7 @@ def api_calculate():
         crop_key=data.get("crop", "winter_wheat"),
         ghi=float(data.get("ghi", 0.0)),
         tariff=float(data.get("tariff", 0.08)),
+        pvout=data.get("pvout"),
     )
     return jsonify(result)
 
